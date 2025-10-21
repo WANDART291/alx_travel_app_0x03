@@ -1,75 +1,67 @@
-// messaging_app/Jenkinsfile
-
 pipeline {
-    agent any 
+  agent any
 
-    // Define environment variables used throughout the pipeline
-    environment {
-        // !! CHANGE THIS to your actual Docker Hub username !!
-        DOCKER_HUB_USER = 'WANDART291' 
-        
-        // Settings required for Django tests
-        DJANGO_SETTINGS_MODULE = 'messaging_app.settings' 
+  environment {
+    DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds') // Jenkins credential ID
+    GITHUB_CREDENTIALS = credentials('github-ssh') // optional
+    IMAGE_NAME = "your-dockerhub-username/messaging_app"
+    IMAGE_TAG = "${env.BUILD_NUMBER}"
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout([$class: 'GitSCM', branches: [[name: '*/main']], userRemoteConfigs: [[url: 'https://github.com/<your-username>/alx-backend-python.git']]])
+      }
     }
 
-    stages {
-        stage('Install Tools and Dependencies') {
-            steps {
-                // Install Docker CLI client (necessary for DooD in your environment)
-                sh 'apk add docker' 
-                
-                // Install Python dependencies for testing
-                sh 'pip install -r requirements.txt'
-                sh 'pip install pytest pytest-django coverage'
-                
-                echo "Dependencies and Docker tools installed."
-            }
+    stage('Install deps & Run tests') {
+      steps {
+        sh '''
+          python -m venv venv
+          . venv/bin/activate
+          pip install --upgrade pip
+          pip install -r messaging_app/requirements.txt
+          pip install pytest pytest-cov
+          cd messaging_app
+          pytest --junitxml=report.xml --cov=./ --cov-report=xml
+        '''
+        // Archive test results for Jenkins
+      }
+      post {
+        always {
+          junit 'messaging_app/report.xml'
+          archiveArtifacts artifacts: 'messaging_app/htmlcov/**', allowEmptyArchive: true
         }
-
-        stage('Run Tests and Generate Report') {
-            steps {
-                // Task 0: Run pytest and capture results
-                sh 'pytest --junitxml=test-reports/junit-report.xml'
-                
-                // Publish the JUnit XML report to Jenkins UI
-                junit 'test-reports/junit-report.xml'
-            }
-        }
-        
-        stage('Build Docker Image') {
-            // Task 1: Build the Docker image
-            steps {
-                script {
-                    // Build the Docker image using the Dockerfile in the current directory (messaging_app)
-                    // We use the BUILD_ID (provided by Jenkins) as a tag for unique identification
-                    sh "docker build -t ${env.DOCKER_HUB_USER}/messaging-app:${env.BUILD_ID} ."
-                }
-            }
-        }
-
-        stage('Push Docker Image') {
-            // Task 1: Securely log in and push to Docker Hub
-            steps {
-                // Uses the credentials stored in Jenkins with the ID 'dockerhub-credentials'
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-credentials', 
-                    passwordVariable: 'DOCKER_PASSWORD',
-                    usernameVariable: 'DOCKER_USERNAME')]) {
-                    
-                    // Log in to Docker Hub
-                    sh "echo \"${DOCKER_PASSWORD}\" | docker login -u \"${DOCKER_USERNAME}\" --password-stdin"
-                    
-                    // Tag the image as 'latest' alongside the unique build ID tag
-                    sh "docker tag ${env.DOCKER_HUB_USER}/messaging-app:${env.BUILD_ID} ${env.DOCKER_HUB_USER}/messaging-app:latest"
-
-                    // Push both the unique ID tag and the 'latest' tag
-                    sh "docker push ${env.DOCKER_HUB_USER}/messaging-app:${env.BUILD_ID}"
-                    sh "docker push ${env.DOCKER_HUB_USER}/messaging-app:latest"
-                    
-                    // Clean up after push
-                    sh "docker logout"
-                }
-            }
-        }
+      }
     }
+
+    stage('Build Docker image') {
+      steps {
+        script {
+          // Build image
+          sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} messaging_app/"
+        }
+      }
+    }
+
+    stage('Push to Docker Hub') {
+      steps {
+        sh """
+          echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin
+          docker push ${IMAGE_NAME}:${IMAGE_TAG}
+        """
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "Pipeline succeeded."
+    }
+    failure {
+      echo "Pipeline failed."
+    }
+  }
 }
+
