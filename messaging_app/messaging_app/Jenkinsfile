@@ -2,7 +2,6 @@ pipeline {
   agent any
 
   environment {
-    DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
     IMAGE_NAME = "wandart/messaging_app"
     IMAGE_TAG = "${env.BUILD_NUMBER}"
   }
@@ -10,7 +9,8 @@ pipeline {
   stages {
     stage('Checkout') {
       steps {
-        checkout([$class: 'GitSCM', branches: [[name: '*/main']], userRemoteConfigs: [[url: 'https://github.com/WANDART291/alx-backend-python.git']]])
+        checkout([$class: 'GitSCM', branches: [[name: '*/main']], 
+                  userRemoteConfigs: [[url: 'https://github.com/WANDART291/alx-backend-python.git']]])
       }
     }
 
@@ -34,8 +34,18 @@ pipeline {
       }
     }
 
-    stage('Build Docker image') {
-      steps {
-        sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} messaging_app/"
-      }
-    }
+    // Docker stages are commented out because your host cannot run Docker
+    // stage('Build Docker image') {
+    //   steps {
+    //     sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} messaging_app/"
+    //   }
+    // }
+    //
+    // stage('Push to Docker Hub') {
+    //   steps {
+    //     sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
+    //   }
+    // }
+  }
+}
+
