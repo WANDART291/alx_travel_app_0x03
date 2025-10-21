@@ -2,23 +2,22 @@ pipeline {
   agent any
 
   environment {
-    DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds') // Jenkins credential ID
-    GITHUB_CREDENTIALS = credentials('github-ssh') // optional
-    IMAGE_NAME = "your-dockerhub-username/messaging_app"
+    DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
+    IMAGE_NAME = "wandart/messaging_app"
     IMAGE_TAG = "${env.BUILD_NUMBER}"
   }
 
   stages {
     stage('Checkout') {
       steps {
-        checkout([$class: 'GitSCM', branches: [[name: '*/main']], userRemoteConfigs: [[url: 'https://github.com/<your-username>/alx-backend-python.git']]])
+        checkout([$class: 'GitSCM', branches: [[name: '*/main']], userRemoteConfigs: [[url: 'https://github.com/WANDART291/alx-backend-python.git']]])
       }
     }
 
-    stage('Install deps & Run tests') {
+    stage('Install dependencies & Run tests') {
       steps {
         sh '''
-          python -m venv venv
+          python3 -m venv venv
           . venv/bin/activate
           pip install --upgrade pip
           pip install -r messaging_app/requirements.txt
@@ -26,7 +25,6 @@ pipeline {
           cd messaging_app
           pytest --junitxml=report.xml --cov=./ --cov-report=xml
         '''
-        // Archive test results for Jenkins
       }
       post {
         always {
@@ -38,30 +36,26 @@ pipeline {
 
     stage('Build Docker image') {
       steps {
-        script {
-          // Build image
-          sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} messaging_app/"
-        }
+        sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} messaging_app/"
       }
     }
 
     stage('Push to Docker Hub') {
       steps {
-        sh """
+        sh '''
           echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin
           docker push ${IMAGE_NAME}:${IMAGE_TAG}
-        """
+        '''
       }
     }
   }
 
   post {
     success {
-      echo "Pipeline succeeded."
+      echo "✅ Pipeline succeeded! Docker image pushed: ${IMAGE_NAME}:${IMAGE_TAG}"
     }
     failure {
-      echo "Pipeline failed."
+      echo "❌ Pipeline failed. Check console output for details."
     }
   }
 }
-
