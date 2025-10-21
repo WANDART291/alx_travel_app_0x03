@@ -1,0 +1,80 @@
+// messaging_app/Jenkinsfile
+
+pipeline {
+    // Defines where the pipeline runs (on the Jenkins Docker container)
+    agent any 
+
+    environment {
+        // !! REPLACE THIS with your actual Docker Hub username !!
+        DOCKER_HUB_USER = 'WANDART291' 
+        // Set Django settings for running tests
+        DJANGO_SETTINGS_MODULE = 'messaging_app.settings' 
+    }
+
+    stages {
+        stage('Install Tools and Dependencies') {
+            steps {
+                // Install Docker CLI client (necessary for DooD to talk to Docker daemon)
+                sh 'apk add docker' 
+                
+                // Install Python dependencies for testing
+                // Assuming requirements.txt is in the messaging_app folder
+                sh 'pip install -r requirements.txt'
+                sh 'pip install pytest pytest-django coverage' 
+                
+                echo "Tools and dependencies installed."
+            }
+        }
+
+        stage('Run Tests and Generate Report') {
+            steps {
+                // Task 0: Run pytest and capture results
+                sh 'pytest --junitxml=test-reports/junit-report.xml'
+                
+                // Publish the JUnit XML report to Jenkins UI
+                junit 'test-reports/junit-report.xml'
+            }
+        }
+        
+        stage('Build Docker Image') {
+            // Task 1: Build the Docker image
+            steps {
+                script {
+                    // Use the short BUILD_ID as a unique tag
+                    def tag = "${env.BUILD_ID}" 
+                    
+                    // Build the Docker image using the Dockerfile in the current directory (messaging_app)
+                    sh "docker build -t ${env.DOCKER_HUB_USER}/messaging-app:${tag} ."
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            // Task 1: Securely log in and push to Docker Hub
+            steps {
+                // Use the credentials stored in Jenkins with the ID 'dockerhub-credentials'
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials', 
+                    passwordVariable: 'DOCKER_PASSWORD',
+                    usernameVariable: 'DOCKER_USERNAME')]) {
+                    
+                    def tag = "${env.BUILD_ID}" 
+                    def full_image = "${env.DOCKER_HUB_USER}/messaging-app:${tag}"
+
+                    // Log in using the injected credentials
+                    sh "echo \"${DOCKER_PASSWORD}\" | docker login -u \"${DOCKER_USERNAME}\" --password-stdin"
+                    
+                    // Tag the image again with the Docker Hub prefix for latest
+                    sh "docker tag ${env.DOCKER_HUB_USER}/messaging-app:${tag} ${env.DOCKER_HUB_USER}/messaging-app:latest"
+
+                    // Push both the unique ID tag and the 'latest' tag
+                    sh "docker push ${full_image}"
+                    sh "docker push ${env.DOCKER_HUB_USER}/messaging-app:latest"
+                    
+                    // Clean up after push
+                    sh "docker logout"
+                }
+            }
+        }
+    }
+}
