@@ -1,0 +1,12 @@
+# Standard Python and Dependency Ignores
+__pycache__/
+*.pyc
+venv/
+env/
+
+# OS and User Files (CRITICAL for cleanup)
+.DS_Store
+Thumbs.db
+# Ignore everything one and two levels up from the repo root
+../../
+../
