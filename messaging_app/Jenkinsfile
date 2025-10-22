@@ -37,8 +37,9 @@ pipeline {
     stage('Build Docker image') {
       steps {
         sh '''
-          echo "Simulating Docker build (Docker not available here)"
-          echo "Would normally build with: docker build -t ${IMAGE_NAME}:${IMAGE_TAG} messaging_app/"
+          echo "Simulating Docker build (Docker not available in this environment)"
+          echo "Would normally run: docker build -t ${IMAGE_NAME}:${IMAGE_TAG} messaging_app/"
+          echo "Would normally push to DockerHub: docker push ${IMAGE_NAME}:${IMAGE_TAG}"
         '''
       }
     }
