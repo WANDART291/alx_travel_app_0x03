@@ -1,10 +1,14 @@
-# alx_travel_app/listings/urls.py
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import ListingViewSet, BookingViewSet
+from .views import initiate_payment, verify_payment
 
-from django.urls import path
-# from .views import InitiateChapaPayment, VerifyChapaPayment <-- COMMENT OUT THIS LINE
+router = DefaultRouter()
+router.register(r'listings', ListingViewSet, basename='listing')
+router.register(r'bookings', BookingViewSet, basename='booking')
 
 urlpatterns = [
-    # Paths are commented out so they don't crash when imports fail
-    # path('initiate-payment/', InitiateChapaPayment.as_view(), name='initiate-payment'),
-    # path('verify-payment/<str:tx_ref>/', VerifyChapaPayment.as_view(), name='verify-payment'),
+    path('', include(router.urls)),
+    path('initiate-payment/<int:booking_id>/', initiate_payment, name='initiate-payment'),
+    path('verify-payment/<str:tx_ref>/', verify_payment, name='verify-payment'),
 ]
